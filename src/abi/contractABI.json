@@ -1,0 +1,34 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_hash",
+        "type": "string"
+      }
+    ],
+    "name": "storeHash",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_hash",
+        "type": "string"
+      }
+    ],
+    "name": "verifyHash",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
