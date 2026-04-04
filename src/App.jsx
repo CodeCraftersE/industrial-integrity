@@ -101,8 +101,8 @@ function App() {
         {/* Live Simulation Section */}
         <TelemetryStream signer={wallet?.signer} />
 
-        {/* Integrity Check Section */}
-        <IntegrityValidator provider={wallet?.provider} />
+        {/* Integrity Check Section — now uses signer for on-chain record lookup */}
+        <IntegrityValidator signer={wallet?.signer} />
         
         <footer className="mt-auto py-10 border-t border-white/5 text-center">
           <p className="text-xs text-slate-600 tracking-widest uppercase font-mono">

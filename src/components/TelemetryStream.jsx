@@ -3,10 +3,11 @@ import Card from './Card';
 import MetricChart from './MetricChart';
 import { formatPulseTime, getTelemetryEntry } from '../utils/generateMachineLog';
 import { generateSHA256Hash } from '../utils/hash';
-import { storeHashOnChain } from '../blockchain';
+import { storeLogOnChain } from '../blockchain';
 
 const TICK_RATE_MS = 10000;
 const MAX_HISTORY = 30;
+const MACHINE_ID = 'SENSOR-NODE-01'; // Identifier for this telemetry source
 
 // Internal mapping for numerical analytics
 const HEALTH_SCORES = {
@@ -90,8 +91,9 @@ function TelemetryStream({ signer }) {
 
     // Fire and forget blockchain storage without blocking UI
     if (signer) {
+      const unixTimestamp = Math.floor(new Date(nextLog.timestamp).getTime() / 1000);
       generateSHA256Hash(nextLog)
-        .then((hash) => storeHashOnChain(hash, signer))
+        .then((hash) => storeLogOnChain(hash, unixTimestamp, nextFile.fileName, MACHINE_ID, signer))
         .then((txHash) => setLastTxHash(txHash))
         .catch((err) => console.error('Failed to store on chain:', err));
     }

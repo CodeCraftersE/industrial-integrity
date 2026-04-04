@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Card from './Card';
 import { generateSHA256Hash } from '../utils/hash';
-import { verifyHashOnChain } from '../blockchain';
+import { verifyFileIntegrity } from '../blockchain';
 
 const VALIDATION_STATES = {
   AUTHENTIC: {
@@ -16,7 +16,7 @@ const VALIDATION_STATES = {
   },
 };
 
-function IntegrityValidator({ provider }) {
+function IntegrityValidator({ signer }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [result, setResult] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -27,7 +27,7 @@ function IntegrityValidator({ provider }) {
       setErrorMessage('Please select a JSON telemetry file first.');
       return;
     }
-    if (!provider) {
+    if (!signer) {
       setErrorMessage('Please connect your Web3 wallet to verify on-chain integrity.');
       return;
     }
@@ -41,11 +41,14 @@ function IntegrityValidator({ provider }) {
       const jsonData = JSON.parse(text);
       const computedHash = await generateSHA256Hash(jsonData);
       
-      const isAuthentic = await verifyHashOnChain(computedHash, provider);
+      const { isAuthentic, matchedRecord } = await verifyFileIntegrity(computedHash, signer);
 
       setResult({
-        uploadedHash: computedHash,
-        originalHash: isAuthentic ? computedHash : 'Unknown/Mismatch',
+        uploadedHash: '0x' + computedHash,
+        originalHash: isAuthentic ? matchedRecord.fileHash : 'No matching record found',
+        fileName: isAuthentic ? matchedRecord.fileName : null,
+        machineId: isAuthentic ? matchedRecord.machineId : null,
+        recordTimestamp: isAuthentic ? new Date(matchedRecord.timestamp * 1000).toISOString() : null,
         status: isAuthentic ? 'AUTHENTIC' : 'TAMPERED',
       });
     } catch (err) {
@@ -132,18 +135,43 @@ function IntegrityValidator({ provider }) {
 
               <div className="mt-6 grid gap-4">
                 <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Known Good Hash</p>
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">On-Chain Hash</p>
                   <p className="mt-2 break-all font-mono text-[11px] text-slate-400">
                     {result.originalHash || 'N/A'}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Detected File Hash</p>
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Computed File Hash</p>
                   <p className="mt-2 break-all font-mono text-[11px] text-slate-400">
                     {result.uploadedHash || 'N/A'}
                   </p>
                 </div>
+
+                {result.status === 'AUTHENTIC' && (
+                  <>
+                    <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                      <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Recorded File Name</p>
+                      <p className="mt-2 font-mono text-[11px] text-emerald-400">
+                        {result.fileName}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Machine ID</p>
+                        <p className="mt-2 font-mono text-[11px] text-cyan-400">
+                          {result.machineId}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                        <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Stored At</p>
+                        <p className="mt-2 font-mono text-[11px] text-slate-400">
+                          {result.recordTimestamp}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -154,7 +182,7 @@ function IntegrityValidator({ provider }) {
                 </p>
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   Select a telemetry record to compare its cryptographic signature 
-                  against the system manifest.
+                  against the on-chain log registry.
                 </p>
               </div>
             </div>
