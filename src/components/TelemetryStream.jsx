@@ -108,15 +108,10 @@ function TelemetryStream({ signer, user }) {
     }, 1200);
   };
 
-  // Auto-start simulation once wallet + auth are both ready
-  useEffect(() => {
-    if (signer && user && !isRunning) {
-      setIsRunning(true);
-    }
-  }, [signer, user]);
+
 
   useEffect(() => {
-    if (!signer) return; // Don't tick without a wallet
+    if (!isRunning || !signer) return; // Don't tick unless actively running with a wallet
     tick();
     return () => window.clearTimeout(generationTimeoutRef.current);
   }, [isRunning, signer]);
@@ -264,7 +259,7 @@ function TelemetryStream({ signer, user }) {
                       : !user
                         ? 'Awaiting Google authentication...'
                         : !isRunning
-                          ? 'Stream paused (Manual Override)'
+                          ? (generationCount === 0 ? 'Ready to initialize feed' : 'Stream paused (Manual Override)')
                           : isGenerating
                             ? 'Compiling packet...'
                             : `Next packet in ${secondsUntilNext}s`}
@@ -284,7 +279,7 @@ function TelemetryStream({ signer, user }) {
                       : 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 active:scale-95'
                       }`}
                   >
-                    {!signer ? 'Connect Wallet' : !user ? 'Sign In First' : isRunning ? 'Stop Feed' : 'Resume Feed'}
+                    {!signer ? 'Connect Wallet' : !user ? 'Sign In First' : isRunning ? 'Stop Feed' : generationCount === 0 ? 'Start Feed' : 'Resume Feed'}
                   </button>
                 </div>
               </div>
