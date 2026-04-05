@@ -3,7 +3,8 @@ import IntegrityValidator from './components/IntegrityValidator';
 import TelemetryStream from './components/TelemetryStream';
 import ThemeToggle from './components/ThemeToggle';
 import { connectWallet } from './blockchain';
-import { signInWithGoogle, logout } from './firebase';
+import { auth, signInWithGoogle, logout } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 function App() {
   const [wallet, setWallet] = useState(null); // { address, provider, signer }
@@ -21,16 +22,40 @@ function App() {
         console.error("Failed to clear logs", err);
       }
     }
-
     clearLogs();
   }, []);
 
-  const handleConnectWallet = async () => {
+  // 1. Persist Google Account Session (Firebase)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Persist Wallet Connection (localStorage)
+  useEffect(() => {
+    const previouslyConnected = localStorage.getItem('connected_wallet_address');
+    if (previouslyConnected) {
+      // Re-connect silently on mount if we had a stored address
+      handleConnectWallet(true);
+    }
+  }, []);
+
+  const handleConnectWallet = async (isAutoReconnect = false) => {
     try {
       const result = await connectWallet();
       setWallet(result);
+      localStorage.setItem('connected_wallet_address', result.address);
     } catch (err) {
-      alert(err.message);
+      if (!isAutoReconnect) {
+        alert(err.message);
+      }
     }
   };
 
@@ -46,6 +71,8 @@ function App() {
   const handleLogout = async () => {
     await logout();
     setUser(null);
+    setWallet(null);
+    localStorage.removeItem('connected_wallet_address');
   };
 
   return (
