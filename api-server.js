@@ -37,8 +37,8 @@ function deleteAllLogs() {
   }
 }
 
-// Initial cleanup on server start
-deleteAllLogs();
+// Initial cleanup on server start disabled as per user request
+// deleteAllLogs();
 
 app.post('/save-log', (req, res) => {
   const { fileName, data } = req.body;
