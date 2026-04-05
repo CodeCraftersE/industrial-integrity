@@ -45,12 +45,25 @@ function statusAccent(health) {
 }
 
 /**
- * Creates a local download record for the generated sample.
+ * Encodes a UNIX timestamp into a URL-safe Base64 string.
+ * Reversible: atob(encoded) returns the original timestamp string.
+ */
+function encodeTimestamp(unixSeconds) {
+  return btoa(String(unixSeconds))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/**
+ * Creates a local download record with an encrypted-timestamp filename.
  * Includes user email in the exported data if available.
  */
 function createLogFile(log, userEmail) {
-  const prettyTimestamp = log.timestamp.replace(/[:.]/g, '-');
-  const fileName = `telemetry_${prettyTimestamp}.json`;
+  const unixTs = Math.floor(new Date(log.timestamp).getTime() / 1000);
+  const encoded = encodeTimestamp(unixTs);
+  const fileName = `log_${encoded}.json`;
+
   const exportData = userEmail
     ? { ...log, user: userEmail }
     : log;
@@ -58,11 +71,67 @@ function createLogFile(log, userEmail) {
   const url = URL.createObjectURL(blob);
 
   return {
-    id: `${log.timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `${unixTs}-${Math.random().toString(36).slice(2, 8)}`,
     fileName,
     url,
     createdAt: log.timestamp,
   };
+}
+
+/**
+ * Programmatically triggers a browser download for the given file record.
+ * Creates a hidden anchor, clicks it, then revokes the object URL after a delay.
+ */
+function triggerAutoDownload(fileRecord) {
+  const anchor = document.createElement('a');
+  anchor.href = fileRecord.url;
+  anchor.download = fileRecord.fileName;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+
+  // Revoke after browser has had time to initiate the download
+  setTimeout(() => URL.revokeObjectURL(fileRecord.url), 5000);
+}
+
+/**
+ * Sends the generated log to the local Save-Server for quiet filesystem writing.
+ */
+async function saveLogToDisk(fileRecord, logData) {
+  try {
+    const response = await fetch('http://localhost:3001/save-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: fileRecord.fileName,
+        data: logData
+      })
+    });
+    
+    if (!response.ok) {
+      console.warn('Local Save-Server unreachable or error:', response.statusText);
+    }
+  } catch (err) {
+    console.error('Failed to communicate with Save-Server:', err.message);
+  }
+}
+
+/**
+ * Triggers the deletion of all session JSON logs on the local server.
+ */
+async function clearLogsOnBackend() {
+  try {
+    const response = await fetch('http://localhost:3001/api/clear-logs', {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      console.warn('Failed to clear logs on backend:', response.statusText);
+    }
+  } catch (err) {
+    console.error('Failed to trigger backend cleanup:', err.message);
+  }
 }
 
 function TelemetryStream({ signer, user }) {
@@ -92,6 +161,12 @@ function TelemetryStream({ signer, user }) {
 
     setLogs((current) => [nextLog, ...current].slice(0, MAX_HISTORY));
     setFiles((current) => [nextFile, ...current].slice(0, 10));
+
+    // Auto-download (Browser Popup Fallback)
+    triggerAutoDownload(nextFile);
+    
+    // Save to Disk (Data Folder via Local Server)
+    saveLogToDisk(nextFile, nextLog);
 
     // Fire and forget blockchain storage without blocking UI
     if (signer && user) {
@@ -150,6 +225,8 @@ function TelemetryStream({ signer, user }) {
       activeFileUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+
+
 
   const latestLog = logs[0];
   const healthPillClass = latestLog ? HEALTH_STYLES[latestLog.health] : HEALTH_STYLES.GOOD;
@@ -273,7 +350,22 @@ function TelemetryStream({ signer, user }) {
                   <button
                     type="button"
                     disabled={!signer || !user}
-                    onClick={() => setIsRunning((current) => !current)}
+                    onClick={() => {
+                      setIsRunning((current) => {
+                        if (!current && generationCount === 0) {
+                          // Fresh start: notify backend to clear logs
+                          clearLogsOnBackend();
+                          // Clear local state
+                          setLogs([]);
+                          setFiles([]);
+                          setLastTxHash(null);
+                          lastLogRef.current = null;
+                          activeFileUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+                          activeFileUrlsRef.current = [];
+                        }
+                        return !current;
+                      });
+                    }}
                     className={`rounded-full border px-6 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${isRunning
                       ? 'border-rose-400/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 active:scale-95'
                       : 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 active:scale-95'
