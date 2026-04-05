@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Card from './Card';
-import { generateSHA256Hash } from '../utils/hash';
+import { generateHash } from '../utils/hash';
 import { verifyFileIntegrity } from '../blockchain';
 
 const VALIDATION_STATES = {
@@ -16,13 +16,17 @@ const VALIDATION_STATES = {
   },
 };
 
-function IntegrityValidator({ signer }) {
+function IntegrityValidator({ signer, user }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [result, setResult] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleVerify = async () => {
+    if (!user) {
+      setErrorMessage('Please login with Google first to verify integrity.');
+      return;
+    }
     if (!selectedFile) {
       setErrorMessage('Please select a JSON telemetry file first.');
       return;
@@ -39,7 +43,7 @@ function IntegrityValidator({ signer }) {
     try {
       const text = await selectedFile.text();
       const jsonData = JSON.parse(text);
-      const computedHash = await generateSHA256Hash(jsonData);
+      const computedHash = await generateHash(jsonData);
       
       const { isAuthentic, matchedRecord } = await verifyFileIntegrity(computedHash, signer);
 
@@ -49,6 +53,7 @@ function IntegrityValidator({ signer }) {
         fileName: isAuthentic ? matchedRecord.fileName : null,
         machineId: isAuthentic ? matchedRecord.machineId : null,
         recordTimestamp: isAuthentic ? new Date(matchedRecord.timestamp * 1000).toISOString() : null,
+        verifiedBy: user.email,
         status: isAuthentic ? 'AUTHENTIC' : 'TAMPERED',
       });
     } catch (err) {
@@ -171,6 +176,15 @@ function IntegrityValidator({ signer }) {
                       </div>
                     </div>
                   </>
+                )}
+
+                {result.verifiedBy && (
+                  <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">Verified By</p>
+                    <p className="mt-2 font-mono text-[11px] text-blue-400">
+                      {result.verifiedBy}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

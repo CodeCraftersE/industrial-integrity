@@ -70,7 +70,10 @@ function App() {
               {user ? (
                 <div className="flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/5 px-4 py-2 text-sm font-semibold text-blue-100">
                   {user.photoURL && <img src={user.photoURL} alt="Avatar" className="w-6 h-6 rounded-full" />}
-                  <span>{user.displayName}</span>
+                  <div className="flex flex-col">
+                    <span>{user.displayName}</span>
+                    <span className="text-[10px] font-mono text-blue-300/70 truncate max-w-[160px]">{user.email}</span>
+                  </div>
                   <button onClick={handleLogout} className="ml-2 text-xs text-slate-400 hover:text-white">Logout</button>
                 </div>
               ) : (
@@ -99,10 +102,10 @@ function App() {
         </header>
 
         {/* Live Simulation Section */}
-        <TelemetryStream signer={wallet?.signer} />
+        <TelemetryStream signer={wallet?.signer} user={user} />
 
         {/* Integrity Check Section — now uses signer for on-chain record lookup */}
-        <IntegrityValidator signer={wallet?.signer} />
+        <IntegrityValidator signer={wallet?.signer} user={user} />
         
         <footer className="mt-auto py-10 border-t border-white/5 text-center">
           <p className="text-xs text-slate-600 tracking-widest uppercase font-mono">

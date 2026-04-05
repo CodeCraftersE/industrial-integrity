@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Card from './Card';
 import MetricChart from './MetricChart';
 import { formatPulseTime, getTelemetryEntry } from '../utils/generateMachineLog';
-import { generateSHA256Hash } from '../utils/hash';
+import { generateHash } from '../utils/hash';
 import { storeLogOnChain } from '../blockchain';
 
 const TICK_RATE_MS = 10000;
@@ -46,11 +46,15 @@ function statusAccent(health) {
 
 /**
  * Creates a local download record for the generated sample.
+ * Includes user email in the exported data if available.
  */
-function createLogFile(log) {
+function createLogFile(log, userEmail) {
   const prettyTimestamp = log.timestamp.replace(/[:.]/g, '-');
   const fileName = `telemetry_${prettyTimestamp}.json`;
-  const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
+  const exportData = userEmail
+    ? { ...log, user: userEmail }
+    : log;
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   return {
@@ -61,13 +65,13 @@ function createLogFile(log) {
   };
 }
 
-function TelemetryStream({ signer }) {
+function TelemetryStream({ signer, user }) {
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
   const [secondsUntilNext, setSecondsUntilNext] = useState(10);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationCount, setGenerationCount] = useState(0);
-  const [isRunning, setIsRunning] = useState(true);
+  const [isRunning, setIsRunning] = useState(false);
   const [lastTxHash, setLastTxHash] = useState(null);
 
   const lastLogRef = useRef(null);
@@ -79,7 +83,7 @@ function TelemetryStream({ signer }) {
   const tick = () => {
     setIsGenerating(true);
     const nextLog = getTelemetryEntry(lastLogRef.current);
-    const nextFile = createLogFile(nextLog);
+    const nextFile = createLogFile(nextLog, user?.email);
 
     lastLogRef.current = nextLog;
     nextEmissionAtRef.current = Date.now() + TICK_RATE_MS;
@@ -90,9 +94,9 @@ function TelemetryStream({ signer }) {
     setFiles((current) => [nextFile, ...current].slice(0, 10));
 
     // Fire and forget blockchain storage without blocking UI
-    if (signer) {
+    if (signer && user) {
       const unixTimestamp = Math.floor(new Date(nextLog.timestamp).getTime() / 1000);
-      generateSHA256Hash(nextLog)
+      generateHash(nextLog)
         .then((hash) => storeLogOnChain(hash, unixTimestamp, nextFile.fileName, MACHINE_ID, signer))
         .then((txHash) => setLastTxHash(txHash))
         .catch((err) => console.error('Failed to store on chain:', err));
@@ -104,13 +108,21 @@ function TelemetryStream({ signer }) {
     }, 1200);
   };
 
+  // Auto-start simulation once wallet + auth are both ready
   useEffect(() => {
-    tick();
-    return () => window.clearTimeout(generationTimeoutRef.current);
-  }, [isRunning]);
+    if (signer && user && !isRunning) {
+      setIsRunning(true);
+    }
+  }, [signer, user]);
 
   useEffect(() => {
-    if (!isRunning) return;
+    if (!signer) return; // Don't tick without a wallet
+    tick();
+    return () => window.clearTimeout(generationTimeoutRef.current);
+  }, [isRunning, signer]);
+
+  useEffect(() => {
+    if (!isRunning || !signer) return;
 
     nextEmissionAtRef.current = Date.now() + TICK_RATE_MS;
     setSecondsUntilNext(10);
@@ -247,11 +259,15 @@ function TelemetryStream({ signer }) {
                     Emission Controller
                   </p>
                   <p className="mt-3 text-xl font-medium text-white">
-                    {!isRunning
-                      ? 'Stream paused (Manual Override)'
-                      : isGenerating
-                        ? 'Compiling packet...'
-                        : `Next packet in ${secondsUntilNext}s`}
+                    {!signer
+                      ? 'Awaiting wallet connection...'
+                      : !user
+                        ? 'Awaiting Google authentication...'
+                        : !isRunning
+                          ? 'Stream paused (Manual Override)'
+                          : isGenerating
+                            ? 'Compiling packet...'
+                            : `Next packet in ${secondsUntilNext}s`}
                   </p>
                 </div>
 
@@ -261,13 +277,14 @@ function TelemetryStream({ signer }) {
                   </div>
                   <button
                     type="button"
+                    disabled={!signer || !user}
                     onClick={() => setIsRunning((current) => !current)}
-                    className={`rounded-full border px-6 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-300 ${isRunning
+                    className={`rounded-full border px-6 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed ${isRunning
                         ? 'border-rose-400/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 active:scale-95'
                         : 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 active:scale-95'
                       }`}
                   >
-                    {isRunning ? 'Stop Feed' : 'Resume Feed'}
+                    {!signer ? 'Connect Wallet' : !user ? 'Sign In First' : isRunning ? 'Stop Feed' : 'Resume Feed'}
                   </button>
                 </div>
               </div>
@@ -312,6 +329,16 @@ function TelemetryStream({ signer }) {
                     <span className="text-rose-400">Wallet offline. Connect to broadcast map.</span>
                   )}
                 </div>
+              </div>
+              <div className="pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400">Operator</p>
+                <p className="mt-3 text-xs font-mono text-slate-300 transition-all duration-300">
+                  {user ? (
+                    <span className="text-blue-400">{user.email}</span>
+                  ) : (
+                    <span className="text-amber-400">Not authenticated</span>
+                  )}
+                </p>
               </div>
               <div className="pt-4 border-t border-white/5">
                 <p className="text-[11px] text-slate-500 leading-relaxed italic">
