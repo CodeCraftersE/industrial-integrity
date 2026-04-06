@@ -83,47 +83,12 @@ function triggerAutoDownload(fileRecord) {
   setTimeout(() => URL.revokeObjectURL(fileRecord.url), 5000);
 }
 
-/**
- * Sends the generated log to the local Save-Server for quiet filesystem writing.
- */
-async function saveLogToDisk(fileRecord, logData) {
-  try {
-    const response = await fetch('http://localhost:3001/save-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: fileRecord.fileName,
-        data: logData
-      })
-    });
-    
-    if (!response.ok) {
-      console.warn('Local Save-Server unreachable or error:', response.statusText);
-    }
-  } catch (err) {
-    console.error('Failed to communicate with Save-Server:', err.message);
-  }
-}
-
-/**
- * Triggers the deletion of all session JSON logs on the local server.
- */
-async function clearLogsOnBackend() {
-  try {
-    const response = await fetch('http://localhost:3001/api/clear-logs', {
-      method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-      console.warn('Failed to clear logs on backend:', response.statusText);
-    }
-  } catch (err) {
-    console.error('Failed to trigger backend cleanup:', err.message);
-  }
-}
 
 function TelemetryStream({ signer, user }) {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState(() => {
+    const saved = localStorage.getItem('machineLogs');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [files, setFiles] = useState([]);
   const [secondsUntilNext, setSecondsUntilNext] = useState(10);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -135,6 +100,11 @@ function TelemetryStream({ signer, user }) {
   const activeFileUrlsRef = useRef([]);
   const nextEmissionAtRef = useRef(Date.now());
   const generationTimeoutRef = useRef(null);
+  
+  // Persist logs to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('machineLogs', JSON.stringify(logs));
+  }, [logs]);
 
   // Core emission logic
   const tick = () => {
@@ -152,9 +122,6 @@ function TelemetryStream({ signer, user }) {
 
     // Auto-download (Browser Popup Fallback)
     triggerAutoDownload(nextFile);
-    
-    // Save to Disk (Data Folder via Local Server)
-    saveLogToDisk(nextFile, nextLog);
 
     // Fire and forget blockchain storage without blocking UI
     if (signer && user) {
@@ -341,9 +308,8 @@ function TelemetryStream({ signer, user }) {
                     onClick={() => {
                       setIsRunning((current) => {
                         if (!current && generationCount === 0) {
-                          // Fresh start: notify backend to clear logs
-                          clearLogsOnBackend();
-                          // Clear local state
+                          // Fresh start: Clear local state and Storage
+                          localStorage.removeItem('machineLogs');
                           setLogs([]);
                           setFiles([]);
                           setLastTxHash(null);

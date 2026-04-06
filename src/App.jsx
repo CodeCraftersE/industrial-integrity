@@ -10,20 +10,6 @@ function App() {
   const [wallet, setWallet] = useState(null); // { address, provider, signer }
   const [user, setUser] = useState(null);
 
-  // 100% Reliable Refresh Cleanup: Triggers on every page load/mount
-  useEffect(() => {
-    async function clearLogs() {
-      try {
-        await fetch("http://localhost:3001/api/clear-logs", {
-          method: "DELETE",
-        });
-        console.log("Logs cleared on refresh");
-      } catch (err) {
-        console.error("Failed to clear logs", err);
-      }
-    }
-    clearLogs();
-  }, []);
 
   // 1. Persist Google Account Session (Firebase)
   useEffect(() => {
