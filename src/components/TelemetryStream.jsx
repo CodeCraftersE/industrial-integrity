@@ -45,24 +45,12 @@ function statusAccent(health) {
 }
 
 /**
- * Encodes a UNIX timestamp into a URL-safe Base64 string.
- * Reversible: atob(encoded) returns the original timestamp string.
- */
-function encodeTimestamp(unixSeconds) {
-  return btoa(String(unixSeconds))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-/**
- * Creates a local download record with an encrypted-timestamp filename.
+ * Creates a local download record with a unix-timestamp filename.
  * Includes user email in the exported data if available.
  */
 function createLogFile(log, userEmail) {
   const unixTs = Math.floor(new Date(log.timestamp).getTime() / 1000);
-  const encoded = encodeTimestamp(unixTs);
-  const fileName = `log_${encoded}.json`;
+  const fileName = `${unixTs}.json`;
 
   const exportData = userEmail
     ? { ...log, user: userEmail }
