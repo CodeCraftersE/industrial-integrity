@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-base: 3 7 18;
+  --c-panel: 10 16 30;
+  --c-surface: 14 23 38;
+  --c-card: 255 255 255;
+  --c-text: 245 248 255;
+  --c-muted: 154 167 189;
+  --c-subtle: 101 116 145;
+  --c-border: 255 255 255;
+
+  --chart-blue-stroke: #4da3ff;
+  --chart-blue-area: rgba(77, 163, 255, 0.12);
+  --chart-blue-text: 125 211 252;
+
+  --chart-pink-stroke: #ff6b9f;
+  --chart-pink-area: rgba(255, 107, 159, 0.11);
+  --chart-pink-text: 251 146 185;
+
+  --chart-yellow-stroke: #f7bf4f;
+  --chart-yellow-area: rgba(247, 191, 79, 0.12);
+  --chart-yellow-text: 253 224 71;
+
+  --chart-emerald-stroke: #42d392;
+  --chart-emerald-area: rgba(66, 211, 146, 0.12);
+  --chart-emerald-text: 74 222 128;
+
+  --accent-purple: 196 181 253;
+  --accent-purple-text: 245 243 255;
+  --accent-blue: 56 189 248;
+  --accent-blue-text: 224 242 254;
+  --accent-emerald: 52 211 153;
+  --accent-emerald-text: 209 250 229;
+  --accent-cyan: 34 211 238;
+  --accent-cyan-text: 236 254 255;
+
+  --shadow-glow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 24px 70px rgba(2, 8, 23, 0.55);
+
+  background:
+    radial-gradient(circle at top left, rgba(16,185,129,0.08), transparent 30%),
+    radial-gradient(circle at 80% 0%, rgba(56,189,248,0.12), transparent 28%),
+    linear-gradient(180deg, #050b17 0%, #040812 45%, #02050c 100%);
+  color: rgb(var(--c-text));
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --click-x: 50%;
+  --click-y: 50%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: transparent;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.24);
+}
+
+.transition-theme,
+.transition-theme * {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease,
+    box-shadow 260ms ease,
+    fill 260ms ease,
+    stroke 260ms ease;
+}
+
+@supports (view-transition-name: root) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 450ms;
+    animation-timing-function: ease;
+  }
+
+  ::view-transition-new(root) {
+    clip-path: circle(0% at var(--click-x) var(--click-y));
+    animation: revealTheme 500ms ease forwards;
+  }
+
+  ::view-transition-old(root) {
+    animation: fadeOld 320ms ease forwards;
+  }
+}
+
+@keyframes revealTheme {
+  to {
+    clip-path: circle(150% at var(--click-x) var(--click-y));
+  }
+}
+
+@keyframes fadeOld {
+  to {
+    opacity: 0;
+  }
+}
